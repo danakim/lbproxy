@@ -1,0 +1,315 @@
+#!/usr/bin/python3.4
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+#    Unless required by applicable law or agreed to in writing, software
+#    distributed under the License is distributed on an "AS IS" BASIS,
+#    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#    See the License for the specific language governing permissions and
+#    limitations under the License.
+#
+# @author: Juliano Martinez (ncode)
+# @author: Taylan Develioglu
+# @author: Dan Achim (dan@hostatic.ro)
+
+import configparser
+import grp
+import os
+import sys
+import pwd
+import json
+from io import TextIOWrapper
+
+import bottle
+from bottle import (
+    abort, debug, get, put, request, run
+)
+
+import lbproxy
+from lbproxy.utils import (
+    config, get_config, get_logger, handle_auth,
+    reply_json, StdOutAndErrWapper
+)
+
+
+app = application = bottle.app()
+logger = get_logger()
+
+# Auxiliary functions
+def build_poolmember_answer(poolmember):
+    if poolmember.enabled:
+        return {"status": "enabled"}
+    else:
+        return {"status": "disabled"}
+
+
+def build_pool_answer(pool):
+    result = {}
+    for poolmember in pool.poolmembers():
+        if poolmember.enabled:
+            result.update({poolmember.name: {"status": "enabled"}})
+        else:
+            result.update({poolmember.name: {"status": "disabled"}})
+    return result
+
+
+def build_partition_answer(partition):
+    result = {}
+    for pool in partition.pools():
+        result.update({pool.name: build_pool_answer(pool)})
+    return result
+
+
+def build_device_answer(device):
+    result = {}
+    for partition in device.partitions():
+        result.update({partition.name: build_partition_answer(partition)})
+    return result
+
+
+# Read the status of one poolmember
+@get('/v1/<loadbalancer>/<partition>/<pool>/<poolmember>')
+@handle_auth
+@reply_json
+def poolmember_query(loadbalancer, partition, pool, poolmember):
+    ''' GET /v1/<loadbalancer>/<partition>/<pool>/<poolmember>
+    HEADER: X-Beam-User: <api_user>
+            X-Beam-Key: <api_key>
+            Content-Type: application/json
+
+    ANSWER: { "status": "<enabled|disabled>" }
+    '''
+    pm = lbproxy.Poolmember(
+        name="/Common/{}".format(poolmember),
+        pool="/{}/{}".format(partition, pool),
+        device=loadbalancer
+    )
+
+    if not pm.exists():
+        abort(404, "Poolmember: %s not found" % partition)
+
+    return build_poolmember_answer
+
+
+# Change the status of one poolmember
+@put('/v1/<loadbalancer>/<partition>/<pool>/<poolmember>')
+@handle_auth
+@reply_json
+def poolmember_query(loadbalancer, partition, pool, poolmember):
+    ''' GET /v1/<loadbalancer>/<partition>/<pool>/<poolmember>
+    HEADER: X-Beam-User: <api_user>
+            X-Beam-Key: <api_key>
+            Content-Type: application/json
+
+    BODY: { "status": "<enabled|disabled>" }
+    ANSWER: { "status": "<enabled|disabled>" }
+    '''
+
+    if not request.body:
+        abort(400, 'No data received')
+
+    try:
+        data = json.load(TextIOWrapper(request.body))
+        if not 'status' in data:
+            abort(400, 'You must have status in your payload')
+
+        if not data['status'] in ['enabled', 'disabled']:
+            abort(400, 'You status must be enabled or disabled')
+
+    except Exception as exp:
+        abort(
+            400, 'Problems reading the data from body: ()'.format(repr(exp))
+        )
+
+    pm = lbproxy.Poolmember(
+        name="/Common/{}".format(poolmember),
+        pool="/{}/{}".format(partition, pool),
+        device=loadbalancer
+    )
+
+    if data['status'] == 'enabled':
+        if pm.enabled:
+            return build_poolmember_answer
+        pm.enabled = True
+    else:
+        if not pm.enabled:
+            return build_poolmember_answer
+        pm.enabled = False
+
+    if not pm.exists():
+        abort(404, "Poolmember: %s not found" % partition)
+
+    return build_poolmember_answer
+
+
+# Read the status of one pool
+@get('/v1/<loadbalancer>/<partition>/<pool>')
+@handle_auth
+@reply_json
+def pool_query(loadbalancer, partition, pool):
+    ''' GET /v1/<loadbalancer>/<partition>/<pool>
+    HEADER: X-Beam-User: <api_user>
+            X-Beam-Key: <api_key>
+            Content-Type: application/json
+
+    ANSWER: {
+                "<node_name1>": { "status": "<enabled|disabled>" },
+                "<node_name2>": { "status": "<enabled|disabled>" },
+            }
+    '''
+    pl = lbproxy.Pool(
+        name="/{}/{}".format(partition, pool),
+        device=loadbalancer
+    )
+
+    if not pl.exists():
+        abort(404, "Pool: %s not found" % {"/{}/{}".format(partition, pool)})
+
+    result = build_pool_answer(pl)
+
+    return result
+
+
+# Read the status of one partition
+@get('/v1/<loadbalancer>/<partition>')
+@handle_auth
+@reply_json
+def pool_query(loadbalancer, partition):
+    ''' GET /v1/<loadbalancer>/<partition>
+    HEADER: X-Beam-User: <api_user>
+            X-Beam-Key: <api_key>
+            Content-Type: application/json
+
+    ANSWER: {
+                "<my_pool>: {
+                    "<node_name1>": { "status": "<enabled|disabled>" },
+                    "<node_name2>": { "status": "<enabled|disabled>" },
+                }
+            }
+    '''
+    pt = lbproxy.Partition(
+        name="/{}".format(partition),
+        device=loadbalancer
+    )
+
+    if not pt.exists():
+        abort(404, "Partition: %s not found" % {"/{}".format(partition)})
+
+    result = build_partition_answer(pt)
+
+    return result
+
+
+# Read the status of one device
+@get('/v1/<loadbalancer>')
+@handle_auth
+@reply_json
+def pool_query(loadbalancer):
+    ''' GET /v1/<loadbalancer>
+    HEADER: X-Beam-User: <api_user>
+            X-Beam-Key: <api_key>
+            Content-Type: application/json
+
+    ANSWER: {
+                "<my_partition1>": {
+                    "<my_pool1>: {
+                        "<node_name1>": { "status": "<enabled|disabled>" },
+                        "<node_name2>": { "status": "<enabled|disabled>" },
+                    },
+                    "<my_pool2>: {
+                        "<node_name3>": { "status": "<enabled|disabled>" },
+                        "<node_name3>": { "status": "<enabled|disabled>" },
+                    },
+                }
+            }
+    '''
+    dv = lbproxy.Device(loadbalancer)
+
+    if not dv.exists():
+        abort(404, "Loadbalancer: %s not found".format(loadbalancer))
+
+    result = build_device_answer(dv)
+
+    return result
+
+
+## Monitoring checks ##
+@get('/app_check')
+def app_check():
+    return 'alive'
+
+
+@get('/lb_check')
+def lb_check():
+    return 'available'
+
+
+def start():
+    # Fetch configuration
+    bind_addr = get_config("lbproxyd", "bind_addr", "0.0.0.0")
+    bind_port = get_config("lbproxyd", "bind_port", 8080, cast=int)
+    _debug = get_config("lbproxyd", "debug", False, cast=bool)
+
+    # Try to find user and group and fall back to user 'nobody'.
+    # If there is no group configured we fall back to user's primary group.
+    user = get_config("lbproxyd", "user", "nobody")
+    group = get_config("lbproxyd", "group")
+
+    pwnam = pwd.getpwnam(user)
+
+    uid = pwnam.pw_uid
+    if group is not None:
+        gid = grp.getgrnam(group).gr_gid
+    else:
+        gid = pwnam.pw_gid
+
+    # Launch lbproxyd
+    debug(_debug)
+
+    os.setgid(gid)
+    os.setuid(uid)
+
+    logger.info("Starting lbproxyd")
+    run(host=bind_addr, port=bind_port)
+    logger.info("Stopped lbproxyd")
+
+
+def main(action="foreground"):
+    from lbproxy.supay import Daemon
+
+    try:
+        pid_dir = config.get("lbproxyd", "pid_dir")
+        daemon = Daemon(name="lbproxyd", pid_dir=pid_dir, log=False)
+    except configparser.NoOptionError:
+        daemon = Daemon(name="lbproxyd", log=False)
+    except:
+        raise
+
+    if action == "start":
+        daemon.start()
+        sys.stdout = StdOutAndErrWapper()
+        sys.stderr = StdOutAndErrWapper()
+        start()
+    elif action == "foreground":
+        start()
+    elif action == "stop":
+        daemon.stop()
+    elif action == "status":
+        daemon.status()
+    else:
+        help()
+
+
+def help():
+    print(("Usage: %s <start|stop|status|foreground>" % sys.argv[0]))
+    sys.exit(1)
+
+
+if __name__ == '__main__':
+    if len(sys.argv) < 2:
+        help()
+    main(action=sys.argv[1])
