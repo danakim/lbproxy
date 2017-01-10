@@ -31,8 +31,8 @@ Virtual Servers.
 ## How is it set up?
 
 Lbproxy is a Python + bottle framework daemon.
-To communicate with the F5s via their SOAP API it uses the (awesome) python F5
-module.
+To communicate with the F5s via their SOAP API it uses the (awesome) [python F5
+library](https://github.com/tdevelioglu/python-f5).
 
 ## Limitations
 
@@ -57,12 +57,14 @@ especially things like loadbalancers the objects live on. They try to autodetect
 as much as possible for you, which might make things slow sometimes.
 
 Endpoint:
+
     @get /v1/shortcut/node
 
 What does it do:
     Returns a list of nodes' statuses in pools
 
 How does a request look like:
+
     GET /v1/shortcut/node
     HEADER: X-Beam-User: <api_user>
             X-Beam-Key: <api_key>
@@ -73,6 +75,7 @@ How does a request look like:
           }
 
 Example:
+
     import json, requests
     lbproxy_headers = {'X-Beam-User': '<api_user>', 'X-Beam-Key': '<api_key>'}
     lbproxy_body = {'<node1_name>': {}, '<node1_name>': {}}
@@ -82,7 +85,8 @@ Example:
     lbproxy_data = json.loads(lbproxy_request.text)
     print(lbproxy_data)
 
-    Expected answer:
+Expected answer:
+
     {
         "node_name_1": {
             "/partition/pool1": "enabled", "/partition/pool2": "enabled"
@@ -93,12 +97,14 @@ Example:
     }
 
 Endpoint:
+
     @put /v1/shortcut/node
 
 What does it do:
     Enables or disables nodes LB-wide (in all pools)
 
 What does a request look like:
+
     PUT /v1/shortcut/node
     HEADER: X-Beam-User: <api_user>
             X-Beam-Key: <api_key>
@@ -110,6 +116,7 @@ What does a request look like:
           }
 
 Example:
+
     import json, requests
     lbproxy_headers = {'X-Beam-User': '<api_user>', 'X-Beam-Key': '<api_key>'}
     lbproxy_body = {'node_name_1': {'status': 'enabled'},
@@ -120,7 +127,8 @@ Example:
     lbproxy_data = json.loads(lbproxy_request.text)
     print(lbproxy_data)
 
-    Expected answer:
+Expected answer:
+
     {
         'node_name_1': 'enabled',
         'node_name_2': 'enabled'
@@ -129,46 +137,56 @@ Example:
 
 ### Other shortcuts
 
-Endpoint: /v1/shortcut/pool/<partition>/<pool>
+Endpoint:
 
-@get /v1/shortcut/pool/<partition>/<pool>
+    @get /v1/shortcut/pool/<partition>/<pool>
+
 Answer:
-{
-    "disabled": [],
-    "enabled": ["node_name_1", "node_name_2"],
-}
 
-@put /v1/shortcut/pool/<partition>/<pool>
+    {
+        "disabled": [],
+        "enabled": ["node_name_1", "node_name_2"],
+    }
+
+    @put /v1/shortcut/pool/<partition>/<pool>
+
 Payload:
-{
-    "disabled": ["node_name_1"],
-}
+
+    {
+        "disabled": ["node_name_1"],
+    }
+
 Answer:
-{
-    "disabled": ["node_name_1"],
-    "enabled": ["node_name_2"],
-}
+    {
+        "disabled": ["node_name_1"],
+        "enabled": ["node_name_2"],
+    }
 
+Endpoint:
 
-Endpoint: /v1/shortcut/partition/<partition>
+    @get /v1/shortcut/partition/WWW
 
-@get /v1/shortcut/partition/WWW
 Answer:
-{
-    "/WWW/pool_1": {"disabled": [], "enabled": ["node_name_1"]},
-    "/WWW/pool_2": {"disabled": [], "enabled": ["node_name_2"]},
-}
 
-@put /v1/shortcut/partition/WWW
+    {
+        "/WWW/pool_1": {"disabled": [], "enabled": ["node_name_1"]},
+        "/WWW/pool_2": {"disabled": [], "enabled": ["node_name_2"]},
+    }
+
+    @put /v1/shortcut/partition/WWW
+
 Payload:
-{
-    "disabled": ["node_name_1"]
-}
+
+    {
+        "disabled": ["node_name_1"]
+    }
+
 Answer:
-{
-    "/WWW/pool_1": {"disabled": [], "enabled": ["node_name_1"]},
-    "/WWW/pool_2": {"disabled": ["node_name_2"], "enabled": ["node_name_3"]},
-}
+
+    {
+        "/WWW/pool_1": {"disabled": [], "enabled": ["node_name_1"]},
+        "/WWW/pool_2": {"disabled": ["node_name_2"], "enabled": ["node_name_3"]},
+    }
 
 ### Standard API endpoints
 
@@ -178,21 +196,25 @@ need to know the load balancer on which the objects you are querying are set
 up on
 
 Endpoint:
+
     @get /v1/<loadbalancer/node/<node>
 
 What does it do:
     Returns node configuration information
 
 What does a request look like:
+
     GET /v1/<loadbalancer>/node/<node>
     HEADER: X-Beam-User: <api_user>
             X-Beam-Key: <api_key>
 
 Example:
-    curl -H 'X-Beam-User: <api_user>' -H 'X-Beam-Key: <api_key>' -i -X GET 'https://<lbproxy_host>/v1/xmllb-101.ams4.prod.booking.com/node/node_name_1'
+
+    curl -H 'X-Beam-User: <api_user>' -H 'X-Beam-Key: <api_key>' -i -X GET 'https://<lbproxy_host>/v1/<loadbalancer>/node/node_name_1'
 
 
 Endpoint:
+
     @get /v1/<loadbalancer>/pool/<partition>/<pool>
 
 What does it do:
@@ -200,6 +222,7 @@ What does it do:
     configuration of specific pool members or all of them
 
 What does a request look like:
+
     GET /v1/<loadbalancer>/pool/<partition>/<pool>
     or
     GET /v1/<loadbalancer>/pool/<partition>/<pool>?member=<pool_member_name|all>
@@ -207,33 +230,38 @@ What does a request look like:
             X-Beam-Key: <api_key>
 
 Example:
+
     curl -H 'X-Beam-User: <api_user>' -H 'X-Beam-Key: <api_key>' -i -X GET 'https://<lbproxy_host>/v1/<load_balancer>/pool/<partition>/<pool>'
     curl -H 'X-Beam-User: <api_user>' -H 'X-Beam-Key: <api_key>' -i -X GET 'https://<lbproxy_host>/v1/<load_balancer>/pool/<partition>/<pool>?member=all' -- returns information about all pool members
     curl -H 'X-Beam-User: <api_user>' -H 'X-Beam-Key: <api_key>' -i -X GET 'https://<lbproxy_host>/v1/<load_balancer>/pool/<partition>/<pool>?member=<node_name>' -- returns information about 'node_name'
 
 
 Endpoint:
+
     @get /v1/<loadbalancer/virtualserver/<partition>/<virtualserver>
 
 What does it do:
     Returns virtualserver configuration information
 
 What does a request look like:
+
     GET /v1/<loadbalancer>/virtualserver/<virtualserver>
     HEADER: X-Beam-User: <api_user>
             X-Beam-Key: <api_key>
 
 Example:
+
     curl -H 'X-Beam-User: <api_user>' -H 'X-Beam-Key: <api_key>' -i -X GET 'https://<lbproxy_host>/v1/<loadbalancer>/virtualserver/<partition>/<pool>'
 
-
 Endpoint:
+
     @post /v1/<loadbalancer/node
 
 What does it do:
     Add a new node to the loadbalancer
 
 What does a request look like:
+
     POST /v1/<loadbalancer>/node
     HEADER: X-Beam-User: <api_user>
             X-Beam-Key: <api_key>
@@ -246,10 +274,12 @@ What does a request look like:
           }
 
 Example:
+
     curl -H 'X-Beam-User: <api_user>' -H 'X-Beam-Key: <api_key>' -H 'Content-Type: application/json' -i -X POST -d '{"test": {"address": "1.2.3.4", "connection_limit": "0"}}' 'https://<lbproxy_host>/v1/<loadbalancer>/node'
 
 
 Endpoint:
+
     @post /v1/<loadbalancer>/pool/<partition>
 
 What does it do:
@@ -257,6 +287,7 @@ What does it do:
     members to it
 
 What does a request look like:
+
     POST /v1/<loadbalancer>/pool/<partition>
     HEADER: X-Beam-User: <api_user>
             X-Beam-Key: <api_key>
@@ -274,16 +305,19 @@ What does a request look like:
            }
 
 Example:
+
     curl -H 'X-Beam-User: <api_user>' -H 'X-Beam-Key: <api_key>' -H 'Content-Type: application/json' -i -X POST -d '{"test": {"lbmethod": "ratio_member", "members": {"test": {"port": "80", "ratio": "5"}}}}' 'https://<lbproxy_host>/v1/<load_balancer>/pool/<partition>' -- the 'lbmethod' can be 'round_robin' or 'ratio_member'. You can also not use the 'members' attribute and it will just add an empty pool
 
 
 Endpoint:
+
     @post /v1/<loadbalancer>/virtualserver/<partition>
 
 What does it do:
     Add a new virtualserver to the loadbalancer
 
 What does a request look like:
+
     POST /v1/<loadbalancer>/virtualserver/<partition>
     HEADER: X-Beam-User: <api_user>
             X-Beam-Key: <api_key>
@@ -298,10 +332,12 @@ What does a request look like:
           }
 
 Example:
+
     curl -H 'X-Beam-User: <api_user>' -H 'X-Beam-Key: <api_key>' -H 'Content-Type: application/json' -i -X POST -d '{"test": {"address": "5.5.5.5", "port": "80", "pool": "test", "protocol": "tcp"}}' 'https://<lbproxy_host>/v1/<loadbalancer>/virtualserver/<partition>'
 
 
 Endpoint:
+
     @put /v1/<loadbalancer>/node
 
 What does it do:
@@ -309,6 +345,7 @@ What does it do:
     loadbalancer level
 
 What does a request look like:
+
     PUT /v1/<loadbalancer>/node
     HEADER: X-Beam-User: <api_user>
             X-Beam-Key: <api_key>
@@ -322,11 +359,13 @@ What does a request look like:
           }
 
 Example:
+
     curl -H 'X-Beam-User: <api_user>' -H 'X-Beam-Key: <api_key>' -H 'Content-Type: application/json' -i -X PUT -d '{"test": {"ratio": "2", "connection_limit": "5"}}' 'https://<lbproxy_host>/v1/<loadbalancer>/node'
     curl -H 'X-Beam-User: <api_user>' -H 'X-Beam-Key: <api_key>' -H 'Content-Type: application/json' -i -X PUT -d '{"test": {"enabled": "false"}}' 'https://<lbproxy_host>/v1/<loadbalancer>/node' -- this disables the node 'test' lb-wide, so in all pools
 
 
 Endpoint:
+
     @put /v1/<loadbalancer>/pool/<partition>
 
 What does it do:
@@ -334,6 +373,7 @@ What does it do:
     or members' properties
 
 What does a request look like:
+
     PUT /v1/<loadbalancer>/pool/<partition>
     HEADER: X-Beam-User: <api_user>
             X-Beam-Key: <api_key>
@@ -360,18 +400,21 @@ What does a request look like:
           }
 
 Example:
+
     curl -H 'X-Beam-User: <api_user>' -H 'X-Beam-Key: <api_key>' -H 'Content-Type: application/json' -i -X PUT -d '{"test": {"lbmethod": "round_robin"}}' 'https://<lbproxy_host>/v1/<loadbalancer>/pool/<partition>'
     curl -H 'X-Beam-User: <api_user>' -H 'X-Beam-Key: <api_key>' -H 'Content-Type: application/json' -i -X PUT -d '{"test": {"members": {"node_name_1": {"port": "80", "ratio": "5"}}}}' 'https://<lbproxy_host>/v1/<loadbalancer>/pool/<partition>' -- this just modifies the node '<node_name_1>' ratio. You always have to specifiy its port as it is part of its identification
     curl -H 'X-Beam-User: <api_user>' -H 'X-Beam-Key: <api_key>' -H 'Content-Type: application/json' -i -X PUT -d '{"test": {"members": {"test": {"port": "80", "enabled": "false"}}}}' 'https://<lbproxy_host>/v1/<loadbalancer>/pool/<partition>' -- this disables the 'test' node just in the 'test' pool. You always have to specifiy its port as it is part of its identification
 
 
 Endpoint:
+
     @put /v1/<loadbalancer>/virtualserver/<partition>
 
 What does it do:
     Modify a virtualserver's properties
 
 What does a request look like:
+
     PUT /v1/<loadbalancer>/virtualserver/<partition>
     HEADER: X-Beam-User: <api_user>
             X-Beam-Key: <api_key>
@@ -387,16 +430,19 @@ What does a request look like:
           }
 
 Example:
+
     curl -H 'X-Beam-User: <api_user>' -H 'X-Beam-Key: <api_key>' -H 'Content-Type: application/json' -i -X PUT -d '{"test": {"port": "443"}}' 'https://<lbproxy_host>/v1/<loadbalancer>/virtualserver/<partition>' -- we just changed the 'test' virtualserver's listen port
 
 
 Endpoint:
+
     @delete /v1/<loadbalancer>/node
 
 What does it do:
     Delete a node lb-wide (from all pools)
 
 What does a request look like:
+
     DELETE /v1/<loadbalancer>/node
     HEADER: X-Beam-User: <api_user>
             X-Beam-Key: <api_key>
@@ -404,16 +450,19 @@ What does a request look like:
     BODY: { "<node_name>": {} }
 
 Example:
+
     curl -H 'X-Beam-User: <api_user>' -H 'X-Beam-Key: <api_key>' -H 'Content-Type: application/json' -i -X DELETE -d '{"test": {}}' 'https://<lbproxy_host>/v1/<loadbalancer>/node' -- we deleted the 'test' node from everywhere on the loadbalancer
 
 
 Endpoint:
+
     @delete /v1/<loadbalancer>/pool/<partition>
 
 What does it do:
     Delete a pool or members from that pool
 
 What does a request look like:
+
     DELETE /v1/<loadbalancer>/pool/<partition>
     HEADER: X-Beam-User: <api_user>
             X-Beam-Key: <api_key>
@@ -428,17 +477,20 @@ What does a request look like:
           }
 
 Example:
+
     curl -H 'X-Beam-User: <api_user>' -H 'X-Beam-Key: <api_key>' -H 'Content-Type: application/json' -i -X DELETE -d '{"test": {"members": {"test": {}}}}' 'https://<lbproxy_host>/v1/<loadbalancer>/pool/<partition>' -- we just deleted the 'test' node from the 'test' pool
     curl -H 'X-Beam-User: <api_user>' -H 'X-Beam-Key: <api_key>' -H 'Content-Type: application/json' -i -X DELETE -d '{"test": {}}' 'https://<lbproxy_host>/v1/<loadbalancer>/pool/<partition>' -- we deleted the entire 'test' pool
 
 
 Endpoint:
+
     @delete /v1/<loadbalancer>/virtualserver/<partition>
 
 What does it do:
     Delete a virtualserver
 
 What does a request look like:
+
     DELETE /v1/<loadbalancer>/virtualserver/<partition>
     HEADER: X-Beam-User: <api_user>
             X-Beam-Key: <api_key>
@@ -446,4 +498,5 @@ What does a request look like:
     BODY: { "<virtualserver_name>": {} }
 
 Example:
+
     curl -H 'X-Beam-User: <api_user>' -H 'X-Beam-Key: <api_key>' -H 'Content-Type: application/json' -i -X DELETE -d '{"test": {}}' 'https://<lbproxy_host>/v1/<loadbalancer>/virtualserver/<partition>'
